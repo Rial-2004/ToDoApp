@@ -44,8 +44,8 @@ fun GreetingPreview() {
     val repo = remember { SettingsRepository(context) }
     val modoOscuro by repo.obtenerModoOscuro().collectAsState(initial = false)
     ToDoAppTheme(
-        darkTheme = true
+        darkTheme = modoOscuro
     ) {
-        NavApp(modo = true)
+        NavApp(modo = modoOscuro)
     }
 }
