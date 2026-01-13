@@ -10,26 +10,20 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import dev.rialmar.todoapp.views.Tareas
 import dev.rialmar.todoapp.views.login
+import dev.rialmar.todoapp.views.signIn
 
 @Composable
 fun NavApp(modo: Boolean){
     val navController = rememberNavController()
-    var nombre by remember { mutableStateOf("") }
-    var alias by remember { mutableStateOf("") }
     NavHost(navController = navController, startDestination = "login"){
         composable("login") {
-            login(
-                onCambioNombre = { nombre = it },
-                navController = navController,
-                onCambioAlias = {alias = it},
-                modo = modo
-            )
+            login(modo, navController)
+        }
+        composable("signIn"){
+            signIn(modo, navController)
         }
         composable("Tareas") {
-            Tareas(
-                nombre = nombre,
-                alias = alias,
-            )
+            Tareas()
         }
     }
 }

@@ -1,20 +1,13 @@
 package dev.rialmar.todoapp.data
 
-import androidx.room.ColumnInfo
-import androidx.room.Entity
-import androidx.room.PrimaryKey
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
-@Entity(tableName = "tarea")
 data class Tarea(
-    @PrimaryKey(autoGenerate = true)
-    val id: Int = 0,
-
-    @ColumnInfo(name = "titulo")
-    val titulo: String,
-
-    @ColumnInfo(name = "descripcion")
-    val descripcion: String,
-
-    @ColumnInfo(name = "fecha")
-    val fecha: String
+    val id: String = "",
+    val titulo: String = "",
+    val descripcion: String = "",
+    val fecha: String = "",
+    val fechaCreacion: String = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
 )

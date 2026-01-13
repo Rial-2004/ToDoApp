@@ -14,8 +14,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import dev.rialmar.todoapp.data.SettingsRepository
 import dev.rialmar.todoapp.ui.theme.ToDoAppTheme
-
-import dev.rialmar.todoapp.views.Tareas
+import dev.rialmar.todoapp.views.login
+import dev.rialmar.todoapp.views.signIn
 
 
 class MainActivity : ComponentActivity() {
@@ -29,8 +29,9 @@ class MainActivity : ComponentActivity() {
             ToDoAppTheme(
                 darkTheme = modoOscuro
             ) {
-                NavApp(modo = modoOscuro)
+                NavApp(modoOscuro)
             }
+
         }
     }
 }
@@ -40,12 +41,4 @@ class MainActivity : ComponentActivity() {
 )
 @Composable
 fun GreetingPreview() {
-    val context = LocalContext.current
-    val repo = remember { SettingsRepository(context) }
-    val modoOscuro by repo.obtenerModoOscuro().collectAsState(initial = false)
-    ToDoAppTheme(
-        darkTheme = true
-    ) {
-        NavApp(modo = true)
-    }
 }

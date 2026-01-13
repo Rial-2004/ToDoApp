@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -34,9 +33,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CardElevation
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
@@ -68,59 +65,65 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavController
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
+import com.google.firebase.auth.ktx.auth
+import com.google.firebase.ktx.Firebase
 import dev.rialmar.todoapp.NotificacionInactividadWorker
+import dev.rialmar.todoapp.data.FirebaseViewModel
 import dev.rialmar.todoapp.data.SettingsRepository
 import dev.rialmar.todoapp.data.Tarea
 
-import dev.rialmar.todoapp.data.TareaViewModel
-import dev.rialmar.todoapp.data.TareaViewModelFactory
-import dev.rialmar.todoapp.data.ToDoDataBase
-import dev.rialmar.todoapp.data.exportarTareas
 import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 
 const val INACTIVITY_WORK_NAME = "InactivityReminderWork"
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Tareas(
-    nombre:String,
-    alias: String
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val repo = remember { SettingsRepository(context) }
+    val usuario = Firebase.auth.currentUser
+    //En caso de que el usuario sea null le asigno un valor por defecto el UID de un usuario de test,
+    // en ocasiones cuando solo hago pruebas de esta vista no hay usuario logueado
+    val uid = usuario?.uid ?: "F92bOMj9fCc77fX1KNJgoMoWcFk1"
+    val firebaseFunciones: FirebaseViewModel = viewModel()
 
+    LaunchedEffect(uid) {
+        firebaseFunciones.cargarListaDelUsuario(uid)
+    }
+
+
+    //Lanza la solicitud de notificaciones
     val requestPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
-        if (isGranted){
+        if (isGranted) {
             Toast.makeText(context, "Notificaciones activadas", Toast.LENGTH_SHORT).show()
-        }else{
+        } else {
             Toast.makeText(context, "Notificaciones no activadas", Toast.LENGTH_SHORT).show()
         }
     }
 
+    //Pide permiso solokuna vez al abrir la app no cada vez que se redibuje, como al mover la pantalla
     LaunchedEffect(Unit) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             val permission = android.Manifest.permission.POST_NOTIFICATIONS
+            //Verifica si ya tiene el permiso o no
             if (context.checkSelfPermission(permission) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                //En caso de no tenerlo muestra la ventana de autorizacion
                 requestPermissionLauncher.launch(permission)
             }
         }
     }
 
     val colorTexto = repo.obtenerColor().collectAsState(initial = Color.White)
-    val database = ToDoDataBase.getBase(context = context)
-    val tareaDao = database.tareaDAO()
 
-    val factory = TareaViewModelFactory(tareaDao = tareaDao)
-    val viewModel: TareaViewModel = viewModel(factory = factory)
-
-    val listaBase by viewModel.todasLasTareas.collectAsState(initial = emptyList())
+    val listaBase = firebaseFunciones.tareasComposables.collectAsState()
 
 
     var searchTarea by remember { mutableStateOf("") }
@@ -134,11 +137,11 @@ fun Tareas(
     var mostrarDialogEliminar by remember { mutableStateOf(false) }
 
 
-    val listaFiltrada = remember(listaBase, searchTarea) {
+    val listaFiltrada = remember(listaBase.value, searchTarea) {
         if (searchTarea.isBlank()) {
-            listaBase
+            listaBase.value
         } else {
-            listaBase.filter { tarea ->
+            listaBase.value.filter { tarea ->
                 tarea.titulo.lowercase().startsWith(searchTarea.lowercase())
             }
         }
@@ -163,14 +166,16 @@ fun Tareas(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    "$nombre $alias",
+                    //Ahora uso la primera parte del correo del usuario para marcar su nombre, en caso de que el usuario actual sea null,
+                    //como en mi caso ya que en ocasiones para hacer pruebas ejecuto la aplicacion desde esta vista y como tal no habria un usuario logueado
+                    text = usuario?.email?.split("@")[0] ?: "User test",
                     color = Color.White,
                     fontSize = 20.sp,
                     modifier = Modifier.padding(20.dp),
                     fontWeight = FontWeight.Bold
                 )
                 Box(modifier = Modifier.padding(end = 10.dp)) {
-                    IconButton(onClick = {expandir = true}) {
+                    IconButton(onClick = { expandir = true }) {
                         Icon(
                             imageVector = Icons.Default.Menu,
                             contentDescription = null,
@@ -178,45 +183,41 @@ fun Tareas(
                         )
                     }
                     DropdownMenu(
-                        expanded = expandir,
-                        onDismissRequest = { expandir = false }) {
+                        expanded = expandir, onDismissRequest = { expandir = false }) {
                         opcionesMenu.forEach { (icono, texto) ->
-                            DropdownMenuItem(
-                                onClick = {
-                                    when(texto){
-                                        "Settings" -> {
-                                            mostrarPreferencias = true
-                                        }
-                                        "Export"->{
-                                            scope.launch {
-                                                val datosExportar = viewModel.obtenerDatosExportables()
-                                                val exito = exportarTareas(context = context, datosExportar)
-                                                if (exito) {
-                                                    Toast.makeText(
-                                                        context, "Tareas exportadas con exito",
-                                                        Toast.LENGTH_SHORT
-                                                    ).show()
-                                                }else{
-                                                    Toast.makeText(
-                                                        context, "Error al exportar las tareas",
-                                                        Toast.LENGTH_SHORT
-                                                    ).show()
-                                                }
+                            DropdownMenuItem(onClick = {
+                                when (texto) {
+                                    "Settings" -> {
+                                        mostrarPreferencias = true
+                                    }
+
+                                    "Export" -> {
+                                        scope.launch {
+                                            //Llamamos a la funcion exportar tareas,
+                                            if (firebaseFunciones.exportarTareas(context = context)) {
+                                                Toast.makeText(
+                                                    context,
+                                                    "Tareas exportadas con exito",
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
+                                            } else {
+                                                Toast.makeText(
+                                                    context,
+                                                    "Error al exportar las tareas",
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
                                             }
                                         }
                                     }
-                                },
-                                text = { Text(texto) },
-                                leadingIcon = {
-                                    Icon(imageVector = icono, contentDescription = null)
                                 }
-                            )
+                            }, text = { Text(texto) }, leadingIcon = {
+                                Icon(imageVector = icono, contentDescription = null)
+                            })
                         }
                     }
                 }
             }
-        },
-        floatingActionButton = {
+        }, floatingActionButton = {
             IconButton(
                 onClick = { mostrarAddTarea = true },
             ) {
@@ -229,8 +230,9 @@ fun Tareas(
                         .padding(10.dp)
                 )
             }
-        },
-        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)
+        }, modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -238,7 +240,7 @@ fun Tareas(
                 .padding(15.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            if (listaBase.count() > 0) {
+            if (listaBase.value.count() > 0) {
                 OutlinedTextField(
                     value = searchTarea,
                     onValueChange = { searchTarea = it },
@@ -259,31 +261,26 @@ fun Tareas(
                             }
 
                         }
-                    }
-                )
+                    })
             }
             LazyColumn(modifier = Modifier.height(600.dp)) {
                 items(listaFiltrada) { tarea ->
                     ElevatedCard(
-                        modifier = Modifier
-                            .padding(top = 5.dp),
+                        modifier = Modifier.padding(top = 5.dp),
                         elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
                         shape = RoundedCornerShape(20.dp),
                         colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.onBackground
+                            containerColor = Color.Black
                         ),
                         onClick = {
                             tareaSeleccionada = tarea
                             mostrarDescripcion = true
-                        }
-                    ) {
+                        }) {
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
-                        )
-                        {
+                        ) {
                             Column(modifier = Modifier.padding(15.dp)) {
                                 Text(
                                     tarea.titulo,
@@ -293,9 +290,7 @@ fun Tareas(
                                     color = colorTexto.value
                                 )
                                 Text(
-                                    tarea.fecha,
-                                    fontSize = 10.sp,
-                                    color = colorTexto.value
+                                    tarea.fecha, fontSize = 10.sp, color = colorTexto.value
                                 )
                             }
 
@@ -328,8 +323,18 @@ fun Tareas(
     if (mostrarAddTarea) {
         dialogoNuevaTarea(
             onCerrar = { mostrarAddTarea = false },
-            onConfirm = { tarea ->
-                viewModel.agregarTarea(tarea = tarea)
+            onConfirm = { titulo, descripcion, fecha ->
+                firebaseFunciones.createTarea(
+                    userUID = uid,
+                    titulo = titulo,
+                    descripcion = descripcion,
+                    fecha = fecha,
+                    resultado = {
+                        Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+                    })
+                mostrarAddTarea = false
+                reiniciarTemporizadorInactividad(context)
+
             })
     }
     if (mostrarDescripcion && tareaSeleccionada != null) {
@@ -340,24 +345,25 @@ fun Tareas(
         dialogoPreferencias(onCerrar = { mostrarPreferencias = false })
     }
 
-    if (mostrarDialogEliminar && tareaSeleccionada != null){
-        dialogoEliminar(onCerrar = {mostrarDialogEliminar = false}, onConfirmar = {(viewModel.eliminarTarea(tareaSeleccionada!!))})
+    if (mostrarDialogEliminar && tareaSeleccionada != null) {
+        dialogoEliminar(onCerrar = { mostrarDialogEliminar = false }, onConfirmar = {
+            (firebaseFunciones.deleteTarea(
+                uid,
+                tareaSeleccionada!!.id,
+                resultado = { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() }))
+        })
     }
 }
+
 private fun reiniciarTemporizadorInactividad(context: Context) {
     val workManager = WorkManager.getInstance(context)
 
-
-    val workRequest = OneTimeWorkRequestBuilder<NotificacionInactividadWorker>()
-        .setInitialDelay(3, TimeUnit.MINUTES)
-        .build()
+    val workRequest = OneTimeWorkRequestBuilder<NotificacionInactividadWorker>().setInitialDelay(
+        3,
+        TimeUnit.MINUTES
+    ).build()
 
     workManager.enqueueUniqueWork(
-        INACTIVITY_WORK_NAME,
-        ExistingWorkPolicy.REPLACE,
-        workRequest
+        INACTIVITY_WORK_NAME, ExistingWorkPolicy.REPLACE, workRequest
     )
 }
-
-
-

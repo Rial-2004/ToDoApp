@@ -15,9 +15,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DisplayMode
 
-import androidx.compose.material3.Divider
-
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -57,8 +56,8 @@ import java.util.Date
 @Composable
 fun dialogoNuevaTarea(
     onCerrar: () -> Unit,
-    onConfirm: (Tarea)-> Unit
-){
+    onConfirm: (titulo: String, descripcion: String, fecha: String) -> Unit
+) {
     var mostrarSelector by remember { mutableStateOf(false) }
 
     var auxtitulo by remember { mutableStateOf("") }
@@ -72,7 +71,7 @@ fun dialogoNuevaTarea(
     AlertDialog(
         onDismissRequest = onCerrar,
         text = {
-            Column{
+            Column {
                 campoTexto(
                     contenido = "Titulo",
                     texto = auxtitulo,
@@ -82,14 +81,17 @@ fun dialogoNuevaTarea(
                     texto = auxdescripcion,
                     onTextoCambiado = { auxdescripcion = it })
 
-                Divider(modifier = Modifier.padding(top = 15.dp))
-                Row(modifier = Modifier.fillMaxWidth(),
+                HorizontalDivider(modifier = Modifier.padding(top = 15.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center){
-                    TextButton(onClick = {mostrarSelector = true}) {
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    TextButton(onClick = { mostrarSelector = true }) {
                         Text(fechaSeleccionada)
                     }
-                    IconButton(onClick = {mostrarSelector = true},
+                    IconButton(
+                        onClick = { mostrarSelector = true },
                     ) {
                         Icon(Icons.Default.DateRange, contentDescription = null)
                     }
@@ -101,7 +103,7 @@ fun dialogoNuevaTarea(
         confirmButton = {
             Button(onClick = {
                 if (!auxtitulo.isBlank()) {
-                    onConfirm(Tarea(titulo = auxtitulo.trim(), descripcion = auxdescripcion.trim(), fecha = fechaSeleccionada.trim()))
+                    onConfirm(auxtitulo, auxdescripcion, fechaSeleccionada)
                     onCerrar()
                 }
             }) {
@@ -117,7 +119,7 @@ fun dialogoNuevaTarea(
         },
         modifier = Modifier.width(300.dp)
     )
-    if (mostrarSelector){
+    if (mostrarSelector) {
         selectorFecha(
             onConfirm = { fecha -> fechaSeleccionada = fecha },
             onCerrar = { mostrarSelector = false },
@@ -127,27 +129,30 @@ fun dialogoNuevaTarea(
 }
 
 @Composable
-fun campoTexto(contenido: String, texto: String, onTextoCambiado: (String) -> Unit){
+fun campoTexto(contenido: String, texto: String, onTextoCambiado: (String) -> Unit) {
     OutlinedTextField(
         value = texto,
         onValueChange = onTextoCambiado,
-        label = {Text(contenido)},
+        label = { Text(contenido) },
         singleLine = contenido == "Titulo"
     )
 }
+
 @Composable
-fun tareaCompleta(tarea: Tarea, onCerrar: () -> Unit){
+fun tareaCompleta(tarea: Tarea, onCerrar: () -> Unit) {
     AlertDialog(
         onDismissRequest = onCerrar,
         title = {
-            Column{
+            Column {
                 Text(tarea.titulo, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 Text(tarea.fecha, fontSize = 14.sp)
-            }},
+            }
+        },
         text = {
-            Text(tarea.descripcion)},
+            Text(tarea.descripcion)
+        },
         confirmButton = {
-            Button(onClick = {onCerrar()}) {
+            Button(onClick = { onCerrar() }) {
                 Text("Ok")
             }
         },
@@ -156,7 +161,7 @@ fun tareaCompleta(tarea: Tarea, onCerrar: () -> Unit){
 
 
 @Composable
-fun dialogoPreferencias(onCerrar: () -> Unit){
+fun dialogoPreferencias(onCerrar: () -> Unit) {
 
     val context = LocalContext.current
     val repo = remember { SettingsRepository(context) }
@@ -173,10 +178,17 @@ fun dialogoPreferencias(onCerrar: () -> Unit){
 
     AlertDialog(
         onDismissRequest = onCerrar,
-        title = {Text("Preferencias", textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())},
+        title = {
+            Text(
+                "Preferencias",
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
         text = {
             Column(
-                modifier = Modifier.fillMaxWidth()){
+                modifier = Modifier.fillMaxWidth()
+            ) {
                 opcionesColores.forEach { (color, nombre) ->
                     Row(
                         modifier = Modifier.padding(start = 30.dp),
@@ -197,16 +209,17 @@ fun dialogoPreferencias(onCerrar: () -> Unit){
                         Text(nombre, fontWeight = FontWeight.Bold)
                     }
                 }
-                Divider()
+                HorizontalDivider()
                 Text("Modo oscuro", modifier = Modifier.padding(start = 35.dp, top = 10.dp))
-                    Switch(
-                        checked = modoOscuro,
-                        onCheckedChange = {modo ->
-                            scope.launch {
-                             repo.guardarModoOscuro(modo)
-                            }},
-                        modifier = Modifier.padding(start = 50.dp)
-                    )
+                Switch(
+                    checked = modoOscuro,
+                    onCheckedChange = {
+                        scope.launch {
+                            repo.guardarModoOscuro(it)
+                        }
+                    },
+                    modifier = Modifier.padding(start = 50.dp)
+                )
             }
         },
         confirmButton = {
@@ -219,10 +232,10 @@ fun dialogoPreferencias(onCerrar: () -> Unit){
 }
 
 @Composable
-fun dialogoEliminar(onCerrar: () -> Unit, onConfirmar: () -> Unit){
+fun dialogoEliminar(onCerrar: () -> Unit, onConfirmar: () -> Unit) {
     AlertDialog(
         onDismissRequest = onCerrar,
-        title = {Text("Estas seguro de eliminar la tarea?")},
+        title = { Text("Estas seguro de eliminar la tarea?") },
         confirmButton = {
             Button(onClick = {
                 onConfirmar()
@@ -245,9 +258,9 @@ fun dialogoEliminar(onCerrar: () -> Unit, onConfirmar: () -> Unit){
 @Composable
 fun selectorFecha(
     formatoFecha: SimpleDateFormat,
-    onConfirm:(String) -> Unit,
+    onConfirm: (String) -> Unit,
     onCerrar: () -> Unit
-){
+) {
     val datePickerState = rememberDatePickerState(
         initialDisplayMode = DisplayMode.Picker,
     )
